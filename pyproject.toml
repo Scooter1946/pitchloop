@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pitchloop"
+version = "0.1.0"
+description = "PitchLoop — a self-improving sales agent that grows its own toolset (Loop Engineering Hackathon)."
+requires-python = ">=3.12"
+
+# Complete shared dependency baseline for ALL roles (P1 owns this file).
+# Placed here before contract freeze so P2-P4 never need to edit dependency files.
+# Remove an entry only if an import/install failure would otherwise block the build.
+dependencies = [
+    "pydantic>=2",
+    "httpx",
+    "fastapi",
+    "uvicorn",
+    "PyYAML",
+    "Jinja2",
+    "rich",
+    "nexla-sdk",
+    "boto3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-mock",
+]
+
+# The code packages are importable directly from the repo root (see pytest
+# pythonpath below and `python -m agent`). An editable install is optional.
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contracts*", "agent*", "integrations*"]
+namespaces = true
+
+[tool.pytest.ini_options]
+# Make the repo root importable so `from contracts.models import ...` and
+# `from agent.orchestrator import ...` work without an editable install.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
