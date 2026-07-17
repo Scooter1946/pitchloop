@@ -14,6 +14,7 @@ from uuid import uuid4
 import httpx
 
 from contracts.models import Evidence
+from evidence.redact import redact
 from evidence.store import EvidenceStore
 
 _ALIASES = {
@@ -26,9 +27,6 @@ _ALIASES = {
     "tool.result": "tool",
     "tool_reloaded": "tool",
 }
-_SECRET_MARKERS = ("secret", "token", "password", "authorization", "api_key", "phone")
-
-
 def _required(payload: dict[str, Any], *names: str) -> Any:
     for name in names:
         if payload.get(name) is not None:
@@ -51,6 +49,8 @@ def normalize_raw(
     raw_type = str(payload.get("type") or event_type)
     evidence_fields = {"run_id", "kind", "claim", "value", "source", "occurred_at"}
     if evidence_fields <= payload.keys():
+        if payload["kind"] == "tool" and payload["claim"] != "fact_b":
+            raise ValueError("tool evidence claim must be fact_b")
         provenance = dict(payload.get("provenance") or {})
         provenance.update({"correlation_id": correlation_id, "raw_type": raw_type})
         return Evidence.model_validate(
@@ -136,31 +136,20 @@ def normalize_raw(
         )
 
     tool = str(_required(payload, "tool"))
+    if payload.get("claim", "fact_b") != "fact_b":
+        raise ValueError("tool evidence claim must be fact_b")
     return Evidence(
         evidence_id=f"ev_tool_{correlation_id}",
         run_id=str(_required(payload, "run_id", "run")),
         candidate_id=str(_required(payload, "candidate_id", "candidate")),
         kind="tool",
-        claim=str(payload.get("claim") or "fact_b"),
+        claim="fact_b",
         value=dict(_required(payload, "output")),
         source=tool,
         source_ref=tool,
         occurred_at=_occurred_at(payload, "timestamp", "observed_at"),
         provenance=provenance,
     )
-
-
-def _redact(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            key: "[REDACTED]"
-            if any(marker in key.lower() for marker in _SECRET_MARKERS)
-            else _redact(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact(item) for item in value]
-    return value
 
 
 def _artifact_root(artifacts: Any = None) -> Path:
@@ -175,7 +164,7 @@ def _artifact_root(artifacts: Any = None) -> Path:
 def _write(root: Path, name: str, value: Any) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / name).write_text(
-        json.dumps(_redact(value), indent=2, sort_keys=True, default=str) + "\n",
+        json.dumps(redact(value), indent=2, sort_keys=True, default=str) + "\n",
         encoding="utf-8",
     )
 
@@ -312,12 +301,47 @@ class NexlaEvidencePort:
             raise
         return correlation_id
 
+    def _get_with_retry(
+        self,
+        url: str,
+        *,
+        failure_name: str,
+        failure_code: str,
+        params: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        response: httpx.Response | None = None
+        for attempt in range(2):
+            try:
+                response = self.client.get(url, params=params)
+                if response.status_code < 500:
+                    return response
+            except httpx.TransportError as exc:
+                if attempt:
+                    _write(
+                        self.artifact_root,
+                        failure_name,
+                        {"code": failure_code, "error": str(exc)},
+                    )
+                    raise
+        assert response is not None
+        _write(
+            self.artifact_root,
+            failure_name,
+            {"code": failure_code, "status_code": response.status_code},
+        )
+        response.raise_for_status()
+        return response
+
     def wait_for_evidence(
         self, correlation_id: str, timeout_seconds: int = 30
     ) -> Evidence:
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() <= deadline:
-            response = self.client.get(f"{self.sink_url}/correlations/{correlation_id}")
+            response = self._get_with_retry(
+                f"{self.sink_url}/correlations/{correlation_id}",
+                failure_name=f"{correlation_id}_failure.json",
+                failure_code="nexla_sink_failed",
+            )
             if response.status_code == 200:
                 evidence = Evidence.model_validate(response.json())
                 _write(
@@ -337,7 +361,12 @@ class NexlaEvidencePort:
         self, run_id: str, *, claim: str | None = None, kind: str | None = None
     ) -> list[Evidence]:
         params = {key: value for key, value in {"run_id": run_id, "claim": claim, "kind": kind}.items() if value is not None}
-        response = self.client.get(f"{self.sink_url}/evidence", params=params)
+        response = self._get_with_retry(
+            f"{self.sink_url}/evidence",
+            params=params,
+            failure_name="query_failure.json",
+            failure_code="nexla_sink_query_failed",
+        )
         response.raise_for_status()
         return [Evidence.model_validate(item) for item in response.json()]
 

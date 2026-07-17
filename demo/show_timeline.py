@@ -22,33 +22,61 @@ def timeline(run_dir: Path) -> list[str]:
     diagnosis = _read(run_dir / "evidence/diagnosis.json")
     search_b = _read(run_dir / "zero/search_fact_b.json")
     conformance = _read(run_dir / "tools/conformance_result.json")
+    pull_request = _read(run_dir / "repo/pr.json")
     merge = _read(run_dir / "repo/merge.json")
-    tool = _read(run_dir / "tools/generated_manifest.json")
+    reload_result = _read(run_dir / "tools/reload.json")
     call_2 = _read(run_dir / "calls/call_2_result.json")
 
-    if denied:
-        lines.append(f"[POLICY] {denied.get('candidate_id', 'alex_rivera')} denied by Pomerium ({denied.get('status_code', 403)})")
-    if allowed:
-        lines.append(f"[POLICY] {allowed.get('candidate_id', 'maya_chen')} allowed by Pomerium ({allowed.get('status_code', 200)})")
-    if fact_a or receipt:
-        service = fact_a.get("service_id") or fact_a.get("service", {}).get("name", "service")
-        cents = receipt.get("amount_cents", fact_a.get("amount_cents", 0))
+    denied_decision = denied.get("decision", denied)
+    allowed_decision = allowed.get("decision", allowed)
+    if denied_decision.get("allowed") is False and denied_decision.get("status_code") == 403:
+        lines.append(
+            f"[POLICY] {denied.get('candidate_id', 'alex_rivera')} denied by Pomerium (403)"
+        )
+    if allowed_decision.get("allowed") is True and allowed_decision.get("status_code") == 200:
+        lines.append(
+            f"[POLICY] {allowed.get('candidate_id', 'maya_chen')} allowed by Pomerium (200)"
+        )
+    fact_result = fact_a.get("result", fact_a)
+    if fact_result.get("statement") and isinstance(receipt.get("amount_cents"), int):
+        service = (
+            fact_a.get("service_id")
+            or fact_a.get("service", {}).get("name")
+            or fact_result.get("source")
+            or receipt.get("service_id", "service")
+        )
+        cents = receipt["amount_cents"]
         lines.append(f"[ZERO] discovered {service} and paid ${cents / 100:.2f}")
-    if call_1:
-        missing = ",".join(call_1.get("missing_claims", [])) or "unknown"
-        lines.append(f"[CALL 1] rejected: missing {missing}")
-    if diagnosis:
+    missing = call_1.get("missing_claims", [])
+    if call_1.get("status") == "rejected" and "fact_b" in missing:
+        lines.append(f"[CALL 1] rejected: missing {','.join(missing)}")
+    if "fact_b" in diagnosis.get("missing_claims", []) and diagnosis.get("evidence_ids"):
         ids = diagnosis.get("evidence_ids") or diagnosis.get("ids") or []
         lines.append(f"[NEXLA] diagnosis cites {','.join(ids)}")
-    if search_b:
+    if search_b.get("no_match") is True:
         lines.append("[ZERO] no marketplace capability matched fact_b")
-    if conformance:
+    if conformance.get("passed") is True or conformance.get("exit_code") == 0:
         lines.append("[CODE] generated tool; fixed conformance passed")
-    if merge:
-        lines.append(f"[GITHUB] PR #{merge.get('number', '?')} merged at {merge.get('merge_sha', '?')}")
-    if tool:
+    merge_result = merge.get("merge", merge)
+    pr_result = pull_request.get("pull_request", pull_request)
+    if merge_result.get("merged") is True:
+        number = (
+            pr_result.get("number")
+            or merge.get("pull_request_number")
+            or pull_request.get("gh_view", {}).get("number")
+            or "?"
+        )
+        merge_sha = (
+            merge_result.get("merge_sha")
+            or merge.get("gh_view", {}).get("mergeCommit", {}).get("oid")
+            or "?"
+        )
+        lines.append(
+            f"[GITHUB] PR #{number} merged at {merge_sha}"
+        )
+    if reload_result.get("found_fact_b") is True:
         lines.append("[TOOL] fact_b acquired from generated tool")
-    if call_2:
+    if call_2.get("status") == "booked":
         lines.append("[CALL 2] meeting booked")
     return lines
 

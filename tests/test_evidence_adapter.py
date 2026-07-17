@@ -119,6 +119,11 @@ def test_p1_evidence_shaped_payload_is_accepted():
     }
 
 
+def test_tool_claim_is_locked_to_fact_b():
+    with pytest.raises(ValueError, match="tool evidence claim must be fact_b"):
+        normalize_raw("tool.result", tool_event(claim="fact_a"), "corr-tool")
+
+
 def test_store_deduplicates_persists_and_filters(tmp_path):
     store = EvidenceStore(tmp_path / "runs")
     later = normalize_raw("tool.result", tool_event(timestamp="2026-07-18T12:00:00Z"), "corr-2")
@@ -154,12 +159,18 @@ def test_local_port_polls_queries_and_redacts_artifacts(tmp_path):
     port = LocalEvidencePort(
         store=EvidenceStore(tmp_path / "runs"), artifacts=artifacts, poll_interval=0
     )
-    event = zero_event(receipt={"api_key": "never-write-me"})
+    event = zero_event(
+        receipt={"api_key": "never-write-me"},
+        output={"statement": "Call +14155551234 for details."},
+    )
     correlation_id = port.publish_raw("zero.paid_result", event)
     evidence = port.wait_for_evidence(correlation_id, timeout_seconds=1)
     assert evidence.claim == "fact_a"
     assert port.query("demo-001", kind="enrichment") == [evidence]
     assert "never-write-me" not in (artifacts / f"{correlation_id}_raw.json").read_text()
+    persisted = (tmp_path / "runs/demo-001/evidence/normalized.jsonl").read_text()
+    assert "never-write-me" not in persisted
+    assert "+14155551234" not in persisted
     with pytest.raises(TimeoutError):
         port.wait_for_evidence("missing", timeout_seconds=0)
 
@@ -252,16 +263,72 @@ def test_live_poll_timeout_is_structured(tmp_path):
         port.wait_for_evidence("corr-timeout", timeout_seconds=0)
 
 
+def test_live_sink_failure_retries_and_writes_artifact(tmp_path):
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(503, request=request)
+
+    port = NexlaEvidencePort(
+        ingress_url="https://nexla.test/ingress",
+        sink_url="https://sink.test",
+        flow_id="flow-1",
+        artifacts=tmp_path,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        flow_checker=lambda _: {"status": "active"},
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        port.wait_for_evidence("corr-sink", timeout_seconds=1)
+    assert attempts == 2
+    assert json.loads((tmp_path / "corr-sink_failure.json").read_text())["code"] == "nexla_sink_failed"
+
+
 def test_timeline_reads_artifacts_without_becoming_state_machine(tmp_path):
     (tmp_path / "policy").mkdir()
     (tmp_path / "calls").mkdir()
+    (tmp_path / "repo").mkdir()
     (tmp_path / "policy/deny.json").write_text(
-        json.dumps({"candidate_id": "alex_rivera", "status_code": 403})
+        json.dumps(
+            {
+                "candidate_id": "alex_rivera",
+                "decision": {"allowed": False, "status_code": 403},
+            }
+        )
     )
     (tmp_path / "calls/call_1_result.json").write_text(
-        json.dumps({"missing_claims": ["fact_b"]})
+        json.dumps({"status": "rejected", "missing_claims": ["fact_b"]})
+    )
+    (tmp_path / "repo/pr.json").write_text(
+        json.dumps({"pull_request": {"number": 7}})
+    )
+    (tmp_path / "repo/merge.json").write_text(
+        json.dumps({"merge": {"merged": True, "merge_sha": "abc123"}})
     )
     assert timeline(tmp_path) == [
         "[POLICY] alex_rivera denied by Pomerium (403)",
         "[CALL 1] rejected: missing fact_b",
+        "[GITHUB] PR #7 merged at abc123",
     ]
+
+
+def test_timeline_does_not_claim_failed_artifacts(tmp_path):
+    for directory in ("policy", "calls", "repo", "tools", "zero"):
+        (tmp_path / directory).mkdir()
+    (tmp_path / "policy/allow.json").write_text(
+        json.dumps({"decision": {"allowed": False, "status_code": 500}})
+    )
+    (tmp_path / "calls/call_2_result.json").write_text(
+        json.dumps({"status": "failed"})
+    )
+    (tmp_path / "repo/merge.json").write_text(
+        json.dumps({"merge": {"merged": False}})
+    )
+    (tmp_path / "tools/conformance_result.json").write_text(
+        json.dumps({"exit_code": 1})
+    )
+    (tmp_path / "zero/search_fact_b.json").write_text(
+        json.dumps({"no_match": False, "matches": [{"id": "found"}]})
+    )
+    assert timeline(tmp_path) == []

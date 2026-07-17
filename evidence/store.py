@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Lock
 
 from contracts.models import Evidence
+from evidence.redact import redact
 
 
 class EvidenceStore:
@@ -32,6 +33,7 @@ class EvidenceStore:
             self._correlations[str(correlation_id)] = evidence.evidence_id
 
     def append(self, evidence: Evidence) -> tuple[Evidence, bool]:
+        evidence = Evidence.model_validate(redact(evidence.model_dump(mode="json")))
         with self._lock:
             existing = self._records.get(evidence.evidence_id)
             if existing:
