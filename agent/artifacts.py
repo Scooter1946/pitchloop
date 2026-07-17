@@ -157,10 +157,15 @@ class Artifacts:
     def append_event(self, event: dict[str, Any]) -> None:
         """Append one redacted JSON line to ``events.jsonl`` (stamped with ts)."""
 
-        record: dict[str, Any] = dict(event)
+        self.append_jsonl(EVENTS_FILE, event)
+
+    def append_jsonl(self, relative_path: str, value: dict[str, Any]) -> None:
+        """Append one redacted, timestamped record to a JSONL artifact."""
+
+        record: dict[str, Any] = dict(value)
         record.setdefault("ts", datetime.now(timezone.utc).isoformat())
         line = _compact_json(redact(serde.to_jsonable(record)))
-        dest = self.path_for(EVENTS_FILE)
+        dest = self.path_for(relative_path)
         dest.parent.mkdir(parents=True, exist_ok=True)
         with open(dest, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")

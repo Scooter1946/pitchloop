@@ -37,6 +37,7 @@ from agent.tool_author import (
     ToolAuthor,
     build_prompt,
 )
+from callee.call_harness import evaluate_campaign_pitch
 
 # Fixed spoken callee responses (global context §2).
 CALL1_RESPONSE = (
@@ -125,8 +126,9 @@ class FakeZeroPort:
         return []
 
     def invoke(self, service: ServiceMatch, payload: dict[str, Any]) -> PaidResult:
+        candidate_id = str(payload.get("candidate_id") or "unknown")
         result = {
-            "candidate_id": payload.get("candidate_id"),
+            "candidate_id": candidate_id,
             "claim": "fact_a",
             "statement": FACT_A_STATEMENT,
             "source": service.service_id,
@@ -137,7 +139,7 @@ class FakeZeroPort:
             "service_id": service.service_id,
             "amount_cents": amount,
         }
-        raw_path = "zero/fact_a_result.json"
+        raw_path = f"zero/contacts/{candidate_id}/fact_a_result.json"
         if self.artifacts is not None:
             self.artifacts.write_json(raw_path, {"result": result, "receipt": receipt})
             raw_path = str(self.artifacts.path_for(raw_path))
@@ -224,34 +226,41 @@ class FakeCallPort:
         *,
         artifacts: Any | None = None,
         price_cents: int = 200,
+        allowed_candidates: list[str] | None = None,
+        max_calls: int = 2,
+        one_call_per_candidate: bool = False,
     ) -> None:
         self.expected_fact_a = expected_fact_a
         self.expected_fact_b_phrase = expected_fact_b_phrase
         self.artifacts = artifacts
         self.price_cents = price_cents
+        self.allowed_candidates = set(allowed_candidates or ["maya_chen"])
+        self.max_calls = max_calls
+        self.one_call_per_candidate = one_call_per_candidate
+        self.called_candidates: set[str] = set()
         self._placed = 0  # for artifact naming / receipt id ONLY, never outcome
 
     def place_call(self, candidate_id: str, pitch_text: str) -> CallResult:
+        if candidate_id not in self.allowed_candidates:
+            raise PermissionError(f"candidate is not allowed by this call adapter: {candidate_id}")
+        if self._placed >= self.max_calls:
+            raise RuntimeError(f"scenario permits at most {self.max_calls} paid call attempts")
+        if self.one_call_per_candidate and candidate_id in self.called_candidates:
+            raise RuntimeError(f"candidate already called in this campaign: {candidate_id}")
+        self.called_candidates.add(candidate_id)
         self._placed += 1
-        has_a = self.expected_fact_a in pitch_text
-        has_b = self.expected_fact_b_phrase in pitch_text
-
-        if not has_a:
-            status, code, missing, response = (
-                "rejected",
-                "REJECTED_MISSING_FACT_A",
-                ["fact_a"] + ([] if has_b else ["fact_b"]),
-                "I don't see anything specific about our company. Not interested.",
-            )
-        elif not has_b:
-            status, code, missing, response = (
-                "rejected",
-                "REJECTED_MISSING_FACT_B",
-                ["fact_b"],
-                CALL1_RESPONSE,
-            )
-        else:
-            status, code, missing, response = ("booked", "MEETING_BOOKED", [], CALL2_RESPONSE)
+        rubric = evaluate_campaign_pitch(
+            candidate_id,
+            pitch_text,
+            self.expected_fact_a,
+            self.expected_fact_b_phrase,
+        )
+        status, code, missing, response = (
+            rubric.status,
+            rubric.code,
+            list(rubric.missing_claims),
+            rubric.response,
+        )
 
         transcript = (
             f"AGENT: {pitch_text}\n"
@@ -285,6 +294,9 @@ def build_fake_call_port(
     artifacts: Any,
     expected_fact_a: str,
     expected_fact_b_phrase: str,
+    allowed_candidates: list[str] | None = None,
+    max_calls: int = 2,
+    one_call_per_candidate: bool = False,
 ) -> FakeCallPort:
     """Mirror of P2's ``build_call_port`` factory signature (§5)."""
 
@@ -292,6 +304,9 @@ def build_fake_call_port(
         expected_fact_a=expected_fact_a,
         expected_fact_b_phrase=expected_fact_b_phrase,
         artifacts=artifacts,
+        allowed_candidates=allowed_candidates,
+        max_calls=max_calls,
+        one_call_per_candidate=one_call_per_candidate,
     )
 
 
@@ -401,7 +416,12 @@ class FakeAuthor:
 # --------------------------------------------------------------------------- #
 
 
-def fake_render_pitch(spec: RunSpec, candidate_id: str, evidence: list[Evidence]) -> str:
+def fake_render_pitch(
+    spec: RunSpec,
+    candidate_id: str,
+    evidence: list[Evidence],
+    strategy_tactics: list[str] | None = None,
+) -> str:
     """Render a pitch that surfaces each obtained fact's statement.
 
     Includes Fact A on the first pitch and Fact A + Fact B on the second, so the
@@ -410,10 +430,15 @@ def fake_render_pitch(spec: RunSpec, candidate_id: str, evidence: list[Evidence]
 
     lines = [f"Hello, I'm reaching out about {spec.product} for {candidate_id}."]
     for ev in evidence:
-        if ev.claim in spec.required_claims and ev.kind in ("enrichment", "tool"):
+        if (
+            ev.candidate_id == candidate_id
+            and ev.claim in spec.required_claims
+            and ev.kind in ("enrichment", "tool")
+        ):
             statement = ev.value.get("statement")
             if statement:
                 lines.append(f"- {statement}")
+    lines.extend(strategy_tactics or [])
     lines.append("Could we book 20 minutes this week?")
     return "\n".join(lines)
 

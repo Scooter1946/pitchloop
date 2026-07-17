@@ -151,6 +151,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     spec = load_spec(args.spec)
+    objective = os.environ.get("PITCHLOOP_OBJECTIVE", "").strip()
+    if objective:
+        spec = spec.model_copy(update={"objective": objective})
     config = build_config()
     artifacts = Artifacts(run_dir=args.run_dir)
     deps = build_deps(spec, config, artifacts)

@@ -24,6 +24,7 @@ class State(str, Enum):
     GENERATE_PITCH = "GENERATE_PITCH"
     CALL = "CALL"
     DIAGNOSE = "DIAGNOSE"
+    REFLECT = "REFLECT"
     DISCOVER_FACT_B = "DISCOVER_FACT_B"
     AUTHOR_TOOL = "AUTHOR_TOOL"
     TEST_TOOL = "TEST_TOOL"
@@ -51,13 +52,19 @@ class RunState:
     ranked_candidates: list[str] = field(default_factory=list)
     tried_candidates: list[str] = field(default_factory=list)
     current_candidate: str | None = None
+    called_candidates: list[str] = field(default_factory=list)
 
     fact_a: Evidence | None = None
     fact_b: Evidence | None = None
     pitch_text: str | None = None
 
     last_call: CallResult | None = None
+    last_call_evidence: Evidence | None = None
     calls_placed: int = 0
+
+    strategy_version: int = 1
+    strategy_tactics: list[str] = field(default_factory=list)
+    reflection_ids: list[str] = field(default_factory=list)
 
     tool_dir: str | None = None
     authored_files: list[str] = field(default_factory=list)

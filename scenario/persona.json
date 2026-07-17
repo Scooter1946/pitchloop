@@ -20,6 +20,36 @@
       "title": "VP Engineering",
       "policy_expected": "allow",
       "phone_env": "CALLEE_PHONE_E164"
+    },
+    "jordan_lee": {
+      "name": "Jordan Lee",
+      "title": "Director of Platform Engineering",
+      "policy_expected": "allow",
+      "phone_env": null
+    },
+    "priya_shah": {
+      "name": "Priya Shah",
+      "title": "Head of Developer Experience",
+      "policy_expected": "allow",
+      "phone_env": null
+    },
+    "luis_martinez": {
+      "name": "Luis Martinez",
+      "title": "VP Infrastructure",
+      "policy_expected": "allow",
+      "phone_env": null
+    },
+    "amina_okafor": {
+      "name": "Amina Okafor",
+      "title": "Director of Engineering Operations",
+      "policy_expected": "allow",
+      "phone_env": null
+    },
+    "theo_williams": {
+      "name": "Theo Williams",
+      "title": "SVP Engineering",
+      "policy_expected": "allow",
+      "phone_env": null
     }
   }
 }

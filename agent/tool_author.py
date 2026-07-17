@@ -258,9 +258,6 @@ class ToolAuthor:
         tool_dir = Path(request.tool_dir)
         tool_dir.mkdir(parents=True, exist_ok=True)
 
-        value = request.canonical_value or {"candidate_id": "maya_chen"}
-        canonical_candidate = value.get("candidate_id", "maya_chen")
-
         module_src = (
             '"""Fetch canonical Fact B evidence from the public fixture."""\n'
             "from __future__ import annotations\n\n"
@@ -270,12 +267,8 @@ class ToolAuthor:
             "from urllib.error import HTTPError, URLError\n"
             "from urllib.parse import urlencode\n"
             "from urllib.request import urlopen\n\n"
-            f"_CANONICAL_CANDIDATE = {canonical_candidate!r}\n"
-            "\n"
             "def run(candidate_id: str) -> dict:\n"
             '    """Return canonical fact_b evidence for the allowed candidate."""\n'
-            "    if candidate_id != _CANONICAL_CANDIDATE:\n"
-            '        return {"candidate_id": candidate_id, "error": "candidate is not allowed"}\n'
             '    base_url = os.environ.get("FACT_B_FIXTURE_URL", "").rstrip("/")\n'
             "    if base_url:\n"
             '        url = f"{base_url}/companies/northstar_systems/migration-signal?{urlencode({\'candidate_id\': candidate_id})}"\n'
@@ -291,6 +284,8 @@ class ToolAuthor:
             '            payload = json.loads(fixture.read_text(encoding="utf-8"))["northstar_systems"]["migration_signal"]\n'
             "        except (OSError, ValueError, KeyError, TypeError) as exc:\n"
             '            return {"candidate_id": candidate_id, "error": f"fixture read failed: {type(exc).__name__}"}\n'
+            '        if candidate_id not in payload.get("allowed_candidates", []):\n'
+            '            return {"candidate_id": candidate_id, "error": "candidate is not allowed"}\n'
             '        payload = {"candidate_id": candidate_id, **payload}\n'
             "        url = fixture.resolve().as_uri()\n"
             '    required = ("candidate_id", "claim", "statement", "source")\n'

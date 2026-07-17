@@ -1,11 +1,17 @@
 {
   "run_id": "demo-001",
   "goal": "book_one_qualified_meeting",
+  "objective": "Learn across Northstar engineering leaders and book one qualified MigrationGuard meeting",
   "product": "MigrationGuard",
   "persona": "VP Engineering at a B2B software company facing an API migration",
   "candidates": [
     "alex_rivera",
-    "maya_chen"
+    "maya_chen",
+    "jordan_lee",
+    "priya_shah",
+    "luis_martinez",
+    "amina_okafor",
+    "theo_williams"
   ],
   "budget_cents": 5000,
   "policy_ref": "pomerium://pitchloop/demo-v1",
@@ -13,5 +19,5 @@
     "fact_a",
     "fact_b"
   ],
-  "max_paid_calls": 2
+  "max_paid_calls": 6
 }

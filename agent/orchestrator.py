@@ -250,6 +250,7 @@ class Orchestrator:
             candidate_id=candidate,
             policy_decision="allow" if decision.allowed else "deny",
             event_type=EventType.POLICY_DECISION,
+            artifact_refs=[rel, f"contacts/{candidate}/policy.json"],
         )
         if not decision.allowed:
             # Observation-driven: a denial routes back to try the next candidate.
@@ -304,6 +305,8 @@ class Orchestrator:
             source_ref=result.provider_ref,
             provenance={"service_id": service.service_id, "raw": result.raw_artifact_path},
             event_type=EventType.ENRICHMENT_PURCHASED,
+            artifact_refs=[result.raw_artifact_path, "zero/fact_a_receipt.json"],
+            amount_cents=result.amount_cents,
         )
         candidate = self.state.current_candidate
         assert candidate is not None
@@ -412,6 +415,12 @@ class Orchestrator:
                 "call_number": self.state.calls_placed,
                 "call_code": call.code,
                 "evidence_ids": [call_evidence.evidence_id],
+                "candidate_id": candidate,
+                "went_well": reflection.went_well,
+                "went_wrong": reflection.went_wrong,
+                "learned": reflection.learned,
+                "next_change": reflection.next_change,
+                "missing_capability": reflection.missing_capability,
                 "artifact_refs": [
                     f"calls/{call_key}/reflection.json",
                     f"reflections/{call_key}.json",
@@ -421,7 +430,11 @@ class Orchestrator:
         self._write_strategy()
         self._emit(
             EventType.CANDIDATE_COMPLETED,
-            {"candidate_id": candidate, "call_number": self.state.calls_placed},
+            {
+                "candidate_id": candidate,
+                "call_number": self.state.calls_placed,
+                "outcome": call.status,
+            },
         )
 
         if call.status == "booked":
@@ -600,6 +613,13 @@ class Orchestrator:
             candidate_id=candidate,
             source_ref=result.provider_ref,
             event_type=EventType.CALL_PLACED,
+            artifact_refs=[
+                f"calls/{call_key}/pitch.md",
+                f"calls/{call_key}/transcript.txt",
+                f"calls/{call_key}/provider_receipt.json",
+                f"calls/call_{n}_result.json",
+            ],
+            amount_cents=result.amount_cents,
         )
         self.deps.artifacts.write_json(
             f"calls/{call_key}/summary.json",
@@ -748,6 +768,8 @@ class Orchestrator:
         source_ref: str | None = None,
         provenance: dict[str, Any] | None = None,
         policy_decision: str | None = None,
+        artifact_refs: list[str] | None = None,
+        amount_cents: int | None = None,
     ) -> Evidence:
         payload = {
             "run_id": self.spec.run_id,
@@ -768,6 +790,9 @@ class Orchestrator:
             "claim": claim,
             "kind": kind,
             "candidate_id": candidate_id,
+            "provider_ref": source_ref,
+            "artifact_refs": artifact_refs or [],
+            "amount_cents": amount_cents,
         }
         if kind == "call":
             event_payload.update(

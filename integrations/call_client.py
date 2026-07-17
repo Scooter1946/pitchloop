@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Mapping
 
-from callee.call_harness import evaluate_pitch
+from callee.call_harness import evaluate_campaign_pitch
 from pitch.transcript_parser import parse_transcript
 
 if TYPE_CHECKING:
@@ -301,23 +301,31 @@ class _BaseCallPort:
         artifacts: Any,
         expected_fact_a: str,
         expected_fact_b_phrase: str,
+        allowed_candidates: list[str] | None = None,
+        max_calls: int = 2,
+        one_call_per_candidate: bool = False,
     ) -> None:
         if not expected_fact_a.strip() or not expected_fact_b_phrase.strip():
             raise ValueError("expected Fact A and Fact B phrase must be non-empty")
         self._artifacts = _ArtifactWriter(artifacts)
         self._expected_fact_a = expected_fact_a
         self._expected_fact_b_phrase = expected_fact_b_phrase
+        self._allowed_candidates = set(allowed_candidates or ["maya_chen"])
+        self._max_calls = max_calls
+        self._one_call_per_candidate = one_call_per_candidate
+        self._called_candidates: set[str] = set()
         self._call_count = 0
 
     def _begin(self, candidate_id: str, pitch_text: str) -> int:
-        if candidate_id != "maya_chen":
-            raise PermissionError(
-                f"paid calls are forbidden for candidate {candidate_id}; only maya_chen is callable"
-            )
+        if candidate_id not in self._allowed_candidates:
+            raise PermissionError(f"candidate is not allowed by this call adapter: {candidate_id}")
         if not isinstance(pitch_text, str) or not pitch_text.strip():
             raise ValueError("pitch_text must be non-empty")
-        if self._call_count >= 2:
-            raise RuntimeError("scenario permits at most two paid call attempts")
+        if self._call_count >= self._max_calls:
+            raise RuntimeError(f"scenario permits at most {self._max_calls} paid call attempts")
+        if self._one_call_per_candidate and candidate_id in self._called_candidates:
+            raise RuntimeError(f"candidate already called in this campaign: {candidate_id}")
+        self._called_candidates.add(candidate_id)
         self._call_count += 1
         index = self._call_count
         self._artifacts.write_text(f"pitch/pitch_{index}.md", pitch_text.strip() + "\n")
@@ -377,7 +385,8 @@ class FakeCallPort(_BaseCallPort):
 
     def place_call(self, candidate_id: str, pitch_text: str) -> "CallResult":
         index = self._begin(candidate_id, pitch_text)
-        rubric = evaluate_pitch(
+        rubric = evaluate_campaign_pitch(
+            candidate_id,
             pitch_text,
             self._expected_fact_a,
             self._expected_fact_b_phrase,
@@ -502,6 +511,9 @@ def build_call_port(
     expected_fact_a: str,
     expected_fact_b_phrase: str,
     mode: str | None = None,
+    allowed_candidates: list[str] | None = None,
+    max_calls: int = 2,
+    one_call_per_candidate: bool = False,
 ) -> "CallPort":
     """Build the configured call port; defaults to safe, unpaid fake mode."""
 
@@ -510,11 +522,16 @@ def build_call_port(
         "artifacts": artifacts,
         "expected_fact_a": expected_fact_a,
         "expected_fact_b_phrase": expected_fact_b_phrase,
+        "allowed_candidates": allowed_candidates,
+        "max_calls": max_calls,
+        "one_call_per_candidate": one_call_per_candidate,
     }
     if selected_mode == "fake":
         return FakeCallPort(**common)  # type: ignore[return-value]
     if selected_mode == "live":
         if zero_port is None:
             raise ValueError("live call mode requires an injected ZeroPort")
-        return ZeroBackedCallPort(zero_port=zero_port, **common)  # type: ignore[return-value]
+        # A single configured phone number is never treated as a contact list.
+        live_common = {**common, "allowed_candidates": ["maya_chen"], "max_calls": 1, "one_call_per_candidate": True}
+        return ZeroBackedCallPort(zero_port=zero_port, **live_common)  # type: ignore[return-value]
     raise ValueError(f"unsupported CALL_MODE: {selected_mode!r}; expected fake or live")

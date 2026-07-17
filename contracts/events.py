@@ -33,6 +33,10 @@ class EventType(str, Enum):
     PR_OPENED = "pr_opened"
     PR_MERGED = "pr_merged"
     TOOL_RELOADED = "tool_reloaded"
+    TOOL_REUSED = "tool_reused"
+    REFLECTION_RECORDED = "reflection_recorded"
+    STRATEGY_UPDATED = "strategy_updated"
+    CANDIDATE_COMPLETED = "candidate_completed"
     MEETING_BOOKED = "meeting_booked"
 
     def __str__(self) -> str:  # so f-strings / json emit the plain value

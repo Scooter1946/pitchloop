@@ -19,6 +19,34 @@ MEETING_BOOKED_RESPONSE = (
     "Yes, that is relevant to what we are doing. Send me a 20-minute invite for "
     "Tuesday at 2 PM."
 )
+REJECTED_WEAK_VALUE_RESPONSE = (
+    "The timing detail is useful, but I still do not understand the business impact. "
+    "I am not taking the meeting."
+)
+REJECTED_NO_PROOF_RESPONSE = (
+    "The value sounds relevant, but I need a concrete example before spending time on it. "
+    "I am not taking the meeting."
+)
+REJECTED_HIGH_FRICTION_RESPONSE = (
+    "This sounds like too much operational change for us right now. I am not taking the meeting."
+)
+REJECTED_TIMING_RESPONSE = (
+    "The approach makes sense, but I cannot justify a broad evaluation this quarter. "
+    "I am not taking the meeting."
+)
+
+BUSINESS_IMPACT_TACTIC = (
+    "Protect release dates."
+)
+PROOF_TACTIC = (
+    "I can show a comparable report."
+)
+LOW_FRICTION_TACTIC = (
+    "Start with one endpoint."
+)
+PILOT_TACTIC = (
+    "Let's define one safe pilot."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,3 +105,40 @@ def evaluate_pitch(
         missing_claims=(),
         response=MEETING_BOOKED_RESPONSE,
     )
+
+
+def evaluate_campaign_pitch(
+    candidate_id: str,
+    pitch_text: str,
+    fact_a_statement: str,
+    fact_b_phrase: str,
+) -> RubricResult:
+    """Apply the base evidence rubric, then one deterministic cohort objection."""
+
+    base = evaluate_pitch(pitch_text, fact_a_statement, fact_b_phrase)
+    if base.status != "booked":
+        return base
+
+    requirements = {
+        "jordan_lee": (
+            BUSINESS_IMPACT_TACTIC,
+            "REJECTED_WEAK_VALUE",
+            REJECTED_WEAK_VALUE_RESPONSE,
+        ),
+        "priya_shah": (PROOF_TACTIC, "REJECTED_NO_PROOF", REJECTED_NO_PROOF_RESPONSE),
+        "luis_martinez": (
+            LOW_FRICTION_TACTIC,
+            "REJECTED_HIGH_FRICTION",
+            REJECTED_HIGH_FRICTION_RESPONSE,
+        ),
+        "amina_okafor": (PILOT_TACTIC, "REJECTED_TIMING", REJECTED_TIMING_RESPONSE),
+    }
+    requirement = requirements.get(candidate_id)
+    if requirement and not _contains_normalized(pitch_text, requirement[0]):
+        return RubricResult(
+            status="rejected",
+            code=requirement[1],
+            missing_claims=(),
+            response=requirement[2],
+        )
+    return base

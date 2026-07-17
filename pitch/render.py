@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from contracts.models import Evidence, RunSpec
 
 
-_SUPPORTED_CANDIDATES = {"alex_rivera": "Alex", "maya_chen": "Maya"}
 _FORBIDDEN_INTERNAL_TERMS = ("zero.xyz", "pomerium", "nexla", "hackathon")
 _MAX_WORDS = 69
 
@@ -77,11 +76,12 @@ def render_pitch(
     spec: "RunSpec",
     candidate_id: str,
     evidence: list["Evidence"],
+    strategy_tactics: list[str] | None = None,
 ) -> str:
     """Render one concise pitch without inventing facts absent from evidence."""
 
     candidates = _field(spec, "candidates", [])
-    if candidate_id not in candidates or candidate_id not in _SUPPORTED_CANDIDATES:
+    if candidate_id not in candidates:
         raise ValueError(f"candidate is not in the locked scenario: {candidate_id}")
 
     run_id = _field(spec, "run_id")
@@ -102,12 +102,13 @@ def render_pitch(
         claim="fact_b",
     )
 
-    first_name = _SUPPORTED_CANDIDATES[candidate_id]
+    first_name = candidate_id.split("_", 1)[0].replace("-", " ").title()
     sentences = [f"Hi {first_name}, I'm calling from {product}."]
     if fact_a:
         sentences.append(f"I noticed {fact_a}.")
     if fact_b:
         sentences.append(f"I also saw that {fact_b}.")
+    sentences.extend(strategy_tactics or [])
     sentences.extend(
         [
             "We generate API migration contract tests and rollout checklists to reduce migration risk.",

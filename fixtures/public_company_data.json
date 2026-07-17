@@ -2,7 +2,12 @@
   "northstar_systems": {
     "migration_signal": {
       "allowed_candidates": [
-        "maya_chen"
+        "maya_chen",
+        "jordan_lee",
+        "priya_shah",
+        "luis_martinez",
+        "amina_okafor",
+        "theo_williams"
       ],
       "claim": "fact_b",
       "statement": "Northstar Systems has an August 30 API v1 migration deadline.",

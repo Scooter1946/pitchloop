@@ -25,6 +25,7 @@ class RunSpec(BaseModel):
     policy_ref: str
     required_claims: list[Literal["fact_a", "fact_b"]]
     max_paid_calls: int = 2
+    objective: str | None = None
 
 
 class Evidence(BaseModel):
@@ -90,6 +91,51 @@ class CallResult(BaseModel):
     receipt: dict[str, Any]
     amount_cents: int
     provider_ref: str | None = None
+
+
+class ReflectionReceipt(BaseModel):
+    """Evidence-backed learning recorded after one candidate call."""
+
+    reflection_id: str
+    run_id: str
+    call_number: int
+    candidate_id: str
+    call_evidence_id: str
+    call_code: str
+    went_well: list[str]
+    went_wrong: list[str]
+    learned: list[str]
+    next_change: list[str]
+    missing_capability: str | None = None
+    strategy_version_before: int
+    strategy_version_after: int
+    occurred_at: datetime
+
+
+class StrategyReceipt(BaseModel):
+    """One immutable campaign strategy version used by later candidates."""
+
+    run_id: str
+    version: int
+    tactics: list[str]
+    based_on_reflection_ids: list[str]
+    occurred_at: datetime
+
+
+class ActionReceipt(BaseModel):
+    """Append-only history record for one agent observation or action."""
+
+    action_id: str
+    run_id: str
+    action: str
+    status: Literal["completed", "failed"]
+    candidate_id: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    artifact_refs: list[str] = Field(default_factory=list)
+    provider_ref: str | None = None
+    amount_cents: int | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+    occurred_at: datetime
 
 
 class PullRequest(BaseModel):

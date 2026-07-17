@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="color-scheme" content="light">
+  <title>PitchLoop{% if model %} · {{ model.run_name }}{% endif %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='dashboard.css') }}">
+  {% if model and model.running %}<meta http-equiv="refresh" content="2">{% endif %}
+</head>
+<body class="{% if not model %}landing-page{% else %}console-page{% endif %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  {% if not model %}
+    <main id="main" class="goal-shell">
+      <section class="goal-panel">
+        <div class="brand-lockup goal-brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div><p class="kicker">Autonomous sales campaign</p><h1>Pitch<span>Loop</span></h1></div>
+        </div>
+        <div class="goal-copy">
+          <p class="section-code">New campaign</p>
+          <h2>What should your agent accomplish?</h2>
+          <p>Give it a concrete outcome. It will call eligible people once, learn from every conversation, and build missing tools when needed.</p>
+        </div>
+        <form class="goal-form" method="post" action="/runs">
+          <label for="objective">Campaign objective</label>
+          <textarea id="objective" name="objective" maxlength="2000" required autofocus>Book one qualified meeting with an engineering leader who needs help shipping an API migration safely.</textarea>
+          <div class="goal-form-footer">
+            <span>Fake/local demo · no real people are contacted</span>
+            <button type="submit">Launch campaign <span aria-hidden="true">→</span></button>
+          </div>
+        </form>
+        {% if runs %}
+          <div class="recent-runs">
+            <p>Recent campaigns</p>
+            {% for run in runs[:5] %}<a href="/runs/{{ run.name }}">{{ run.name }}</a>{% endfor %}
+          </div>
+        {% endif %}
+      </section>
+      <aside class="goal-aside" aria-label="Campaign loop">
+        <p class="section-code">How the loop learns</p>
+        <ol>
+          <li><span>01</span><div><strong>Choose a new person</strong><small>Policy-gated and never called twice</small></div></li>
+          <li><span>02</span><div><strong>Call with evidence</strong><small>Every provider action leaves a receipt</small></div></li>
+          <li><span>03</span><div><strong>Reflect on the result</strong><small>What worked, failed, and changes next</small></div></li>
+          <li><span>04</span><div><strong>Grow the toolset</strong><small>Search Zero, then build and verify gaps</small></div></li>
+        </ol>
+      </aside>
+    </main>
+  {% else %}
+    <header class="masthead console-head">
+      <a class="brand-lockup brand-link" href="/" aria-label="Start a new PitchLoop campaign">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div><p class="kicker">Campaign command center</p><h1>Pitch<span>Loop</span></h1></div>
+      </a>
+      <div class="run-controls">
+        <span class="mode-badge"><span aria-hidden="true"></span>{{ model.mode }}</span>
+        <label class="run-picker">Campaign
+          <select onchange="if(this.value) location.href='/runs/'+this.value">
+            {% for run in runs %}<option value="{{ run.name }}"{% if run.name == model.run_name %} selected{% endif %}>{{ run.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <a class="new-run" href="/">+ New goal</a>
+      </div>
+    </header>
+
+    <main id="main" class="console-main">
+      {% if model.errors %}
+        <aside class="warning-strip"><strong>Partial readout</strong><span>{{ model.errors|join(' · ') }}</span></aside>
+      {% endif %}
+
+      <section class="campaign-hero">
+        <div>
+          <p class="section-code">{{ model.run_name }} · {{ model.state|replace('_', ' ') }}</p>
+          <h2>{{ model.objective }}</h2>
+        </div>
+        <div class="campaign-status campaign-status--{{ 'running' if model.running else 'done' }}">
+          <span class="pulse" aria-hidden="true"></span>
+          <div><small>{{ 'Agent working' if model.running else 'Campaign complete' }}</small><strong>{{ model.outcome|replace('_', ' ') }}</strong></div>
+        </div>
+      </section>
+
+      <section class="stat-grid" aria-label="Campaign statistics">
+        <article><span>Calls placed</span><strong>{{ model.stats.calls }}</strong><small>{{ model.stats.remaining }} people remaining</small></article>
+        <article><span>Successful meetings / sales</span><strong>{{ model.stats.booked }}</strong><small>{% if model.meeting %}Meeting receipt captured{% else %}No booked outcome yet{% endif %}</small></article>
+        <article><span>Policy denied</span><strong>{{ model.stats.denied }}</strong><small>Blocked before any call</small></article>
+        <article><span>Campaign spend</span><strong>${{ '%.2f'|format(model.stats.spent_cents / 100) }}</strong><small>of ${{ '%.2f'|format(model.stats.budget_cents / 100) }} budget</small></article>
+      </section>
+
+      {% if model.selected_call %}
+        {% set call = model.selected_call %}
+        <section class="call-detail" aria-labelledby="call-detail-title">
+          <div class="section-heading section-heading--compact">
+            <div><p class="section-code">Call {{ '%02d'|format(call.number) }} / complete record</p><h2 id="call-detail-title">{{ call.candidate_id|replace('_', ' ') }}</h2></div>
+            <div class="detail-nav"><span class="status-pill status-pill--{{ call.status }}">{{ call.status }}</span><a href="/runs/{{ model.run_name }}">Close detail ×</a></div>
+          </div>
+
+          <div class="call-detail-grid">
+            <article class="transcript-panel">
+              <div class="panel-heading"><span>Full transcript</span><strong>{{ call.code|replace('_', ' ') }}</strong></div>
+              <pre>{{ call.transcript or 'Transcript is being recorded…' }}</pre>
+            </article>
+            <article class="pitch-panel">
+              <div class="panel-heading"><span>Pitch used</span><strong>Strategy input</strong></div>
+              <blockquote>{{ call.pitch or 'Pitch is being prepared…' }}</blockquote>
+            </article>
+          </div>
+
+          {% set reflection = call.reflection %}
+          <div class="reflection-grid">
+            <article class="reflection-card reflection-card--good"><span>What went well</span><ul>{% for item in reflection.went_well|default([]) %}<li>{{ item }}</li>{% else %}<li>Awaiting reflection receipt</li>{% endfor %}</ul></article>
+            <article class="reflection-card reflection-card--bad"><span>What went wrong</span><ul>{% for item in reflection.went_wrong|default([]) %}<li>{{ item }}</li>{% else %}<li>No issue recorded</li>{% endfor %}</ul></article>
+            <article class="reflection-card"><span>What the agent learned</span><ul>{% for item in reflection.learned|default([]) %}<li>{{ item }}</li>{% else %}<li>Awaiting reflection receipt</li>{% endfor %}</ul></article>
+            <article class="reflection-card reflection-card--next"><span>Change for the next person</span><ul>{% for item in reflection.next_change|default([]) %}<li>{{ item }}</li>{% else %}<li>Keep the current strategy</li>{% endfor %}</ul>{% if reflection.missing_capability %}<p>Tool needed · <strong>{{ reflection.missing_capability }}</strong></p>{% endif %}</article>
+          </div>
+
+          <div class="receipt-grid">
+            {% for label, receipt in [('Policy', call.policy_receipt), ('Enrichment', call.enrichment_receipt), ('Provider / payment', call.provider_receipt), ('Diagnosis', call.diagnosis)] %}
+              <details class="receipt"{% if loop.first %} open{% endif %}><summary>{{ label }} receipt <span>+</span></summary><pre>{{ model.pretty(receipt) if receipt else 'Not recorded yet' }}</pre></details>
+            {% endfor %}
+          </div>
+
+          <div class="detail-lower-grid">
+            <section>
+              <div class="mini-heading"><h3>Linked evidence</h3><span>{{ call.evidence|length }} records</span></div>
+              <div class="evidence-list">
+                {% for item in call.evidence %}<article><span>{{ item.kind }} · {{ item.claim }}</span><code>{{ item.evidence_id }}</code><small>{{ item.source }}</small></article>{% else %}<p class="empty-row">No linked evidence yet.</p>{% endfor %}
+              </div>
+            </section>
+            <section>
+              <div class="mini-heading"><h3>Call actions</h3><span>{{ call.actions|length }} receipts</span></div>
+              <ol class="compact-actions">
+                {% for action in call.actions %}<li><span class="action-dot"></span><div><strong>{{ action.action|replace('_', ' ') }}</strong><small>{{ action.occurred_at|default('') }} · {{ action.status }}</small></div></li>{% else %}<li class="empty-row">No action receipts yet.</li>{% endfor %}
+              </ol>
+            </section>
+          </div>
+        </section>
+      {% endif %}
+
+      <div class="dashboard-grid">
+        <section class="calls-section">
+          <div class="section-heading section-heading--compact">
+            <div><p class="section-code">People and calls</p><h2>Campaign queue</h2></div>
+            <span class="event-count">{{ model.contacts|length }} people</span>
+          </div>
+          <table class="calls-table">
+            <thead><tr><th>Person</th><th>Policy / call</th><th>Outcome</th><th>Learning</th><th></th></tr></thead>
+            <tbody>
+              {% for contact in model.contacts %}
+                <tr>
+                  <td><strong>{{ contact.candidate_id|replace('_', ' ') }}</strong><small>{{ 'Call %02d'|format(contact.call.number) if contact.call else 'Not called' }}</small></td>
+                  <td><span class="status-pill status-pill--{{ contact.status }}">{{ contact.status|replace('_', ' ') }}</span></td>
+                  <td>{{ contact.call.code|replace('_', ' ') if contact.call else ('Policy blocked' if contact.status == 'denied' else 'Waiting') }}</td>
+                  <td>{% if contact.call and contact.call.reflection %}Strategy v{{ contact.call.reflection.strategy_version_after }}{% elif contact.call %}Reflecting…{% else %}—{% endif %}</td>
+                  <td>{% if contact.call %}<a class="row-link" href="/runs/{{ model.run_name }}/calls/{{ contact.call.id }}">Open record →</a>{% endif %}</td>
+                </tr>
+              {% else %}<tr><td colspan="5" class="empty-row">Campaign plan is loading…</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </section>
+
+        <aside class="strategy-section">
+          <div class="section-heading section-heading--compact"><div><p class="section-code">Live playbook</p><h2>Current strategy</h2></div></div>
+          {% if model.current_strategy %}
+            <span class="strategy-version">Version {{ model.current_strategy.version }}</span>
+            <ul>{% for tactic in model.current_strategy.tactics %}<li>{{ tactic }}</li>{% else %}<li>Lead with verified company context.</li>{% endfor %}</ul>
+            <small>Based on {{ model.current_strategy.based_on_reflection_ids|default([])|length }} call reflections</small>
+          {% else %}<p class="empty-row">The initial strategy is being prepared.</p>{% endif %}
+        </aside>
+      </div>
+
+      <div class="history-grid">
+        <section class="learning-section">
+          <div class="section-heading section-heading--compact"><div><p class="section-code">Cross-person learning</p><h2>Learning timeline</h2></div></div>
+          <ol class="learning-timeline">
+            {% for reflection in model.reflections %}
+              <li><span>{{ '%02d'|format(reflection.call_number) }}</span><div><strong>{{ reflection.candidate_id|replace('_', ' ') }} · {{ reflection.call_code|replace('_', ' ') }}</strong><p>{{ reflection.learned|join(' ') }}</p><small>Strategy v{{ reflection.strategy_version_before }} → v{{ reflection.strategy_version_after }}{% if reflection.missing_capability %} · needed {{ reflection.missing_capability }}{% endif %}</small></div></li>
+            {% else %}<li class="empty-row">Learning appears after the first completed call.</li>{% endfor %}
+          </ol>
+        </section>
+
+        <section class="tools-section">
+          <div class="section-heading section-heading--compact"><div><p class="section-code">Self-improvement</p><h2>Tool history</h2></div></div>
+          {% if model.tool_manifest %}<div class="installed-tool"><span>Installed tool</span><strong>{{ model.tool_manifest.manifest.name|default('Generated capability') }}</strong><small>{{ model.tool_manifest.manifest.capability|default('fact_b') }} · {{ model.tool_manifest.mode|default('local') }}</small></div>{% endif %}
+          <ol class="compact-actions">
+            {% for action in model.tool_actions %}<li><span class="action-dot"></span><div><strong>{{ action.action|replace('_', ' ') }}</strong><small>{{ action.status }} · {{ action.occurred_at|default('') }}</small></div></li>{% else %}<li class="empty-row">No tool changes yet. Existing tools are reused first.</li>{% endfor %}
+          </ol>
+        </section>
+      </div>
+
+      <section class="action-section">
+        <div class="section-heading section-heading--compact"><div><p class="section-code">Append-only ledger</p><h2>Agent logs &amp; action history</h2></div><span class="event-count">{{ model.actions|length }} receipts</span></div>
+        <div class="action-ledger">
+          {% for action in model.actions|reverse %}
+            <article><span class="action-index">{{ action.action_id|default(loop.index) }}</span><div><strong>{{ action.action|replace('_', ' ') }}</strong><small>{{ action.candidate_id|default('campaign', true)|replace('_', ' ') }} · {{ action.status }} · {{ action.occurred_at|default('') }}</small></div><span class="action-cost">{% if action.amount_cents is number %}${{ '%.2f'|format(action.amount_cents / 100) }}{% endif %}</span></article>
+          {% else %}<p class="empty-row">Agent actions are starting…</p>{% endfor %}
+        </div>
+      </section>
+    </main>
+
+    {% if model.running %}<div class="refresh-note"><span class="pulse"></span> Live artifacts refresh every 2 seconds</div>{% endif %}
+  {% endif %}
+</body>
+</html>

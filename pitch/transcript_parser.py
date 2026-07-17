@@ -5,9 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from callee.call_harness import (
+    BUSINESS_IMPACT_TACTIC,
+    LOW_FRICTION_TACTIC,
     MEETING_BOOKED_RESPONSE,
+    PILOT_TACTIC,
+    PROOF_TACTIC,
+    REJECTED_HIGH_FRICTION_RESPONSE,
     REJECTED_MISSING_FACT_A_RESPONSE,
     REJECTED_MISSING_FACT_B_RESPONSE,
+    REJECTED_NO_PROOF_RESPONSE,
+    REJECTED_TIMING_RESPONSE,
+    REJECTED_WEAK_VALUE_RESPONSE,
     normalize_for_match,
 )
 
@@ -29,6 +37,18 @@ _PHRASE_TO_RESULT = {
         status="rejected",
         code="REJECTED_MISSING_FACT_B",
         missing_claims=("fact_b",),
+    ),
+    normalize_for_match(REJECTED_WEAK_VALUE_RESPONSE): ParsedTranscript(
+        status="rejected", code="REJECTED_WEAK_VALUE", missing_claims=()
+    ),
+    normalize_for_match(REJECTED_NO_PROOF_RESPONSE): ParsedTranscript(
+        status="rejected", code="REJECTED_NO_PROOF", missing_claims=()
+    ),
+    normalize_for_match(REJECTED_HIGH_FRICTION_RESPONSE): ParsedTranscript(
+        status="rejected", code="REJECTED_HIGH_FRICTION", missing_claims=()
+    ),
+    normalize_for_match(REJECTED_TIMING_RESPONSE): ParsedTranscript(
+        status="rejected", code="REJECTED_TIMING", missing_claims=()
     ),
     normalize_for_match(MEETING_BOOKED_RESPONSE): ParsedTranscript(
         status="booked",
@@ -73,6 +93,10 @@ def parse_transcript(
     pitch_is_consistent = {
         "REJECTED_MISSING_FACT_A": not has_a,
         "REJECTED_MISSING_FACT_B": has_a and not has_b,
+        "REJECTED_WEAK_VALUE": has_a and has_b and not _pitch_contains(pitch_text, BUSINESS_IMPACT_TACTIC),
+        "REJECTED_NO_PROOF": has_a and has_b and not _pitch_contains(pitch_text, PROOF_TACTIC),
+        "REJECTED_HIGH_FRICTION": has_a and has_b and not _pitch_contains(pitch_text, LOW_FRICTION_TACTIC),
+        "REJECTED_TIMING": has_a and has_b and not _pitch_contains(pitch_text, PILOT_TACTIC),
         "MEETING_BOOKED": has_a and has_b,
     }[parsed.code]
     return parsed if pitch_is_consistent else _FAILED

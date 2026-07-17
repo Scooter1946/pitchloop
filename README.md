@@ -1,18 +1,18 @@
 # PitchLoop
 
-PitchLoop is a consent-gated sales agent that acquires and authors missing evidence tools before retrying a paid call.
+PitchLoop is a consent-gated sales campaign agent that learns across people and acquires or authors missing evidence tools.
 
 ## Problem and insight
 
-Most self-improving agents rewrite prompts. PitchLoop improves its toolset: a failed call identifies a missing evidence claim, the agent searches Zero.xyz, authors one constrained tool when no service matches, tests and merges it, then retries the same action.
+Most self-improving agents rewrite prompts. PitchLoop records an evidence-backed reflection after every call, updates the campaign strategy for the next person, and grows its toolset when a missing capability blocks progress.
 
 ## Deterministic scenario
 
-PitchLoop sells the fictional MigrationGuard product to fictional Northstar Systems. `alex_rivera` is denied by policy and is never called. Consenting teammate `maya_chen` receives two calls governed by one deterministic rubric: Call 1 contains Fact A but lacks only Fact B; Call 2 contains both and books a meeting.
+PitchLoop sells the fictional MigrationGuard product to fictional Northstar Systems. `alex_rivera` is denied by policy and is never called. Each eligible contact is called at most once. Maya exposes a missing deadline signal; later contacts surface value, proof, friction, and timing objections; the accumulated strategy eventually books Theo.
 
 ## Autonomous loop
 
-Specification → plan → Pomerium deny/allow → Zero discovery and paid Fact A → Call 1 → Nexla-normalized diagnosis → Zero Fact B no-match → generated tool and conformance → GitHub PR merge → registry reload → Fact B → Call 2.
+Goal → plan → candidate policy/enrichment → one call → normalized diagnosis → reflection receipt → strategy/tool improvement → next uncalled candidate → qualified meeting.
 
 ## Architecture
 
@@ -47,13 +47,26 @@ cp .env.example .env
 demo/run_demo.sh
 ```
 
+## Visual demo
+
+```bash
+.venv/bin/python -m demo.ui
+```
+
+Open `http://127.0.0.1:8000`, enter a natural-language campaign objective, and
+launch the fake/local campaign. The desktop dashboard refreshes while the agent
+works and exposes campaign statistics, every candidate and call, reflections,
+strategy changes, generated tools, evidence, receipts, transcripts, and the
+append-only agent action history. Click a completed call to inspect its full
+record; use the campaign picker to revisit prior runs.
+
 ## Live configuration
 
 Set the environment variables listed in `.env.example`. For Nexla, expose the local sink with ngrok, configure one webhook → transform → REST destination flow, then set `NEXLA_SERVICE_KEY`, `NEXLA_INGRESS_URL`, `NEXLA_FLOW_ID`, and the public `NEXLA_SINK_URL`. Never commit their values.
 
 ## Proof artifacts
 
-The integrated fake demo writes each run under `runs/fake-demo.*`; 88 tests pass and the loop reaches `MEETING_BOOKED`. Nexla lineage, paid receipts, Pomerium responses, calls, and the generated-tool PR remain live-run artifacts and must not be represented as complete until captured.
+The integrated fake demo writes each run under `runs/fake-demo.*` or `runs/campaign-*` and reaches `MEETING_BOOKED`. Nexla lineage, paid receipts, Pomerium responses, calls, and the generated-tool PR remain live-run artifacts and must not be represented as complete until captured.
 
 ## Generated-tool PR
 
@@ -61,7 +74,7 @@ Pending the live autonomous run. The generated tool is restricted to `fact_b` an
 
 ## Limitations and ethics
 
-This hackathon build supports one fictional company, one consenting callee, two calls, and one generated tool. It has no dashboard, arbitrary outreach, calendar integration, or policy bypass. Phone numbers, credentials, and unredacted receipts are excluded from Git.
+This hackathon build supports one fictional company, a deterministic desktop campaign, and one generated capability. Live calling remains deliberately limited to one configured callee; the larger cohort is fake/local. It has no arbitrary outreach, calendar integration, or policy bypass. Phone numbers, credentials, and unredacted receipts are excluded from Git.
 
 ## Team
 
@@ -79,4 +92,4 @@ This hackathon build supports one fictional company, one consenting callee, two 
 | Runtime discovery and paid action | `zero/search_fact_a.json`, receipts |
 | Diagnose missing capability | Nexla-normalized evidence and `evidence/diagnosis.json` |
 | Author, test, and merge tool | conformance result and generated-tool PR |
-| Reload and improve result | Fact B evidence and booked Call 2 artifact |
+| Reload and improve later calls | Tool reuse, strategy versions, reflection receipts, and the booked meeting artifact |

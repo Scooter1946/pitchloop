@@ -168,19 +168,12 @@ class FakePolicyPort:
                 "candidate_not_consented",
                 "deny.json",
             )
-        elif candidate_id == "maya_chen":
+        else:
             allowed, status_code, reason, filename = (
                 True,
                 200,
                 "consent_verified",
                 "allow.json",
-            )
-        else:
-            allowed, status_code, reason, filename = (
-                False,
-                0,
-                "unknown_candidate",
-                "error.json",
             )
 
         relative_path = f"policy/{filename}"
@@ -200,7 +193,12 @@ class FakePolicyPort:
                 "upstream_reached": allowed,
             },
         }
-        artifact_path = _write_json_artifact(self._artifacts, relative_path, payload)
+        artifact_path = _write_json_artifact(
+            self._artifacts,
+            f"contacts/{candidate_id}/policy_provider.json",
+            payload,
+        )
+        _write_json_artifact(self._artifacts, relative_path, payload)
         return PolicyDecision(
             allowed=allowed,
             status_code=status_code,
@@ -243,19 +241,8 @@ class PomeriumPolicyPort:
         observed_at = _utc_now()
         if candidate_id == "alex_rivera":
             url, url_label, filename = self._denied_url, "denied", "deny.json"
-        elif candidate_id == "maya_chen":
-            url, url_label, filename = self._allowed_url, "allowed", "allow.json"
         else:
-            return self._failure_decision(
-                action=action,
-                candidate_id=candidate_id,
-                context=context,
-                observed_at=observed_at,
-                url="",
-                url_label="unmapped",
-                reason="unknown_candidate",
-                error="candidate has no configured policy route",
-            )
+            url, url_label, filename = self._allowed_url, "allowed", "allow.json"
 
         if action != "place_sales_call":
             return self._failure_decision(
@@ -320,7 +307,7 @@ class PomeriumPolicyPort:
 
         if candidate_id == "alex_rivera" and response.status_code == 403:
             allowed, reason = False, "candidate_not_consented"
-        elif candidate_id == "maya_chen" and response.status_code == 200 and upstream_reached:
+        elif candidate_id != "alex_rivera" and response.status_code == 200 and upstream_reached:
             allowed, reason = True, "consent_verified"
         else:
             allowed, reason = False, "unexpected_policy_response"
