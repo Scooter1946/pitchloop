@@ -1,0 +1,25 @@
+{
+  "company": {
+    "id": "northstar_systems",
+    "name": "Northstar Systems",
+    "description": "Fictional B2B API platform company"
+  },
+  "product": {
+    "name": "MigrationGuard",
+    "value_proposition": "Generates API migration contract tests and rollout checklists"
+  },
+  "contacts": {
+    "alex_rivera": {
+      "name": "Alex Rivera",
+      "title": "CTO",
+      "policy_expected": "deny",
+      "phone_env": null
+    },
+    "maya_chen": {
+      "name": "Maya Chen",
+      "title": "VP Engineering",
+      "policy_expected": "allow",
+      "phone_env": "CALLEE_PHONE_E164"
+    }
+  }
+}

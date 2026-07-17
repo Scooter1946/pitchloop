@@ -1,0 +1,17 @@
+{
+  "run_id": "demo-001",
+  "goal": "book_one_qualified_meeting",
+  "product": "MigrationGuard",
+  "persona": "VP Engineering at a B2B software company facing an API migration",
+  "candidates": [
+    "alex_rivera",
+    "maya_chen"
+  ],
+  "budget_cents": 200,
+  "policy_ref": "pomerium://pitchloop/demo-v1",
+  "required_claims": [
+    "fact_a",
+    "fact_b"
+  ],
+  "max_paid_calls": 2
+}

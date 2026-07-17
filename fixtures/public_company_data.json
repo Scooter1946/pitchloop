@@ -1,0 +1,13 @@
+{
+  "northstar_systems": {
+    "migration_signal": {
+      "allowed_candidates": [
+        "maya_chen"
+      ],
+      "claim": "fact_b",
+      "statement": "Northstar Systems has an August 30 API v1 migration deadline.",
+      "source": "northstar_public_migration_signal",
+      "published_at": "2026-07-17T12:00:00-07:00"
+    }
+  }
+}

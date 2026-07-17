@@ -1,0 +1,19 @@
+version: 1
+match_mode: normalized_substring
+required_claims:
+  - fact_a
+  - fact_b
+precedence:
+  - when_missing: fact_a
+    status: rejected
+    code: REJECTED_MISSING_FACT_A
+  - when_missing: fact_b
+    status: rejected
+    code: REJECTED_MISSING_FACT_B
+  - when_missing: null
+    status: booked
+    code: MEETING_BOOKED
+fixed_responses:
+  REJECTED_MISSING_FACT_A: "That is too generic and does not show that you understand what is relevant to us. I am not taking the meeting."
+  REJECTED_MISSING_FACT_B: "That first point is relevant, but you have not shown that you understand our August 30 API v1 migration deadline. I am not taking the meeting."
+  MEETING_BOOKED: "Yes, that is relevant to what we are doing. Send me a 20-minute invite for Tuesday at 2 PM."
