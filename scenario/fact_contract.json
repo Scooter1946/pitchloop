@@ -1,0 +1,17 @@
+{
+  "fact_a": {
+    "claim": "fact_a",
+    "source": "zero_paid_enrichment",
+    "statement": null,
+    "match_mode": "normalized_substring",
+    "locked_at_runtime": true
+  },
+  "fact_b": {
+    "claim": "fact_b",
+    "source": "northstar_public_migration_signal",
+    "statement": "Northstar Systems has an August 30 API v1 migration deadline.",
+    "required_phrase": "August 30 API v1 migration deadline",
+    "match_mode": "normalized_substring",
+    "locked_at_runtime": false
+  }
+}
